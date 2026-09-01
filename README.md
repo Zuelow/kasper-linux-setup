@@ -3,7 +3,17 @@
 Post-install setup for Linux Mint, Debian, Fedora and Arch: Nordic/European
 localisation plus a desktop theme (Windows 11/10, macOS, Arc, Nordic and more).
 
-**Current version:** 4.1.0
+**Current version:** 4.2.0
+
+### What's new in 4.2.0
+
+Fixed a bug where a single dropped connection or a renamed/unreachable theme
+repo (Fluent, WhiteSur, Orchis, Colloid, Graphite, Nordic, Windows-10,
+ArcMenu) would silently kill the *entire* install partway through — including
+every step still to come (menu button, panel layout, the final summary) —
+instead of just skipping that one theme and continuing, which is what the
+script's own messages already promised. `git clone` failures now retry a
+couple of times and fall back to a warning instead of aborting the run.
 
 ## Usage
 

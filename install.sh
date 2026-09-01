@@ -18,7 +18,7 @@ fi
 set -euo pipefail
 
 # Not VERSION: /etc/os-release is sourced further down and would overwrite it.
-SCRIPT_VERSION="4.1.0"
+SCRIPT_VERSION="4.2.0"
 DISTRO=""              # debian|ubuntu|mint|fedora|arch (empty = detect, then ask)
 DESKTOP=""             # cinnamon | gnome | xfce | mate | plasma | other
                        #                               (empty = detect, then ask)
@@ -212,6 +212,7 @@ set_messages() {
   M_MINTTHEME="Using the system's own theme"
   M_BIGTHEME="WhiteSur is a large theme - this takes a minute or two."
   M_THEMEFAIL="%s installation failed"
+  M_CLONEFAIL="Could not fetch %s - continuing without it"
   M_WOULDSET="Would set theme %s with icons %s"
   M_NOSESS1="No graphical session (over SSH?) - the theme is installed,"
   M_NOSESS2="but you have to pick it under Menu > Themes."
@@ -352,6 +353,7 @@ set_messages() {
       M_MINTTHEME="Bruger systemets eget tema"
       M_BIGTHEME="WhiteSur er et stort tema - det tager et minut eller to."
       M_THEMEFAIL="Installationen af %s fejlede"
+      M_CLONEFAIL="Kunne ikke hente %s - fortsætter uden"
       M_WOULDSET="Ville sætte temaet %s med ikonerne %s"
       M_NOSESS1="Ingen grafisk session (kører du over SSH?) - temaet er installeret,"
       M_NOSESS2="men du skal selv vælge det under Menu > Temaer."
@@ -489,6 +491,7 @@ set_messages() {
       M_MINTTHEME="Bruker systemets eget tema"
       M_BIGTHEME="WhiteSur er et stort tema - det tar et minutt eller to."
       M_THEMEFAIL="Installasjonen av %s feilet"
+      M_CLONEFAIL="Klarte ikke å hente %s - fortsetter uten"
       M_WOULDSET="Ville satt temaet %s med ikonene %s"
       M_NOSESS1="Ingen grafisk økt (kjører du over SSH?) - temaet er installert,"
       M_NOSESS2="men du må velge det selv under Meny > Tema."
@@ -626,6 +629,7 @@ set_messages() {
       M_MINTTHEME="Använder systemets eget tema"
       M_BIGTHEME="WhiteSur är ett stort tema - det tar en minut eller två."
       M_THEMEFAIL="Installationen av %s misslyckades"
+      M_CLONEFAIL="Kunde inte hämta %s - fortsätter utan"
       M_WOULDSET="Skulle sätta temat %s med ikonerna %s"
       M_NOSESS1="Ingen grafisk session (kör du över SSH?) - temat är installerat,"
       M_NOSESS2="men du måste välja det själv under Meny > Teman."
@@ -763,6 +767,7 @@ set_messages() {
       M_MINTTHEME="Verwende das systemeigene Thema"
       M_BIGTHEME="WhiteSur ist ein großes Thema - das dauert ein bis zwei Minuten."
       M_THEMEFAIL="Installation von %s fehlgeschlagen"
+      M_CLONEFAIL="Konnte %s nicht holen - weiter ohne"
       M_WOULDSET="Würde Thema %s mit den Symbolen %s setzen"
       M_NOSESS1="Keine grafische Sitzung (über SSH?) - das Thema ist installiert,"
       M_NOSESS2="Sie müssen es unter Menü > Themen selbst auswählen."
@@ -1701,9 +1706,27 @@ KBEOF
 fi
 
 # ---------- desktop look ------------------------------------------------------
+# A dropped connection, a renamed repo, or GitHub being briefly unreachable is
+# routine - not a reason to take the whole run down. Every call site here is a
+# bare statement, so under `set -e` a plain non-zero from git would have ended
+# the script right there; this always returns 0 and warns instead, leaving the
+# usual "theme not found" handling further down to notice the empty directory
+# and say so, the same way it would for any other missing theme. A flaky link
+# gets a couple of retries before that.
 clone() {                          # clone URL DEST
   if [ "$DRY_RUN" = 1 ]; then printf '  %s[dry]%s git clone %s\n' "$C_Y" "$C_0" "$1"; return 0; fi
-  rm -rf "$2"; git clone --depth=1 -q "$1" "$2"
+  rm -rf "$2"
+  local tries=0
+  until git clone --depth=1 -q "$1" "$2" 2>/dev/null; do
+    tries=$((tries + 1))
+    if [ "$tries" -ge 3 ]; then
+      warn "$(fmt "$M_CLONEFAIL" "$1")"
+      rm -rf "$2"
+      return 0
+    fi
+    sleep 2
+  done
+  return 0
 }
 
 # Like gset, but for a schema that is not installed system-wide - a GNOME
